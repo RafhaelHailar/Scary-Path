@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scary Path</title>
+    <style>
+        body {
+            padding: 0;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .position {
+            position: absolute;
+            left: 10%;
+        }
+
+        canvas {
+            /* visibility: hidden; */
+        }
+        
+    </style>
+</head>
+<body>
+    
+    <div class="position">
+        <div>to x : <span id="toX">0</span></div>
+        <div>to y : <span id="toY">0</span></div>
+        <div>facing at: <span id="faceAt">0</span></div>
+        <div>facing direction: <span id="faceDirection">up</span></div>
+        <div>should face at: <span id="shouldFace">left</span></div>
+    </div>
+
+    <audio src="./523758_6142149-lq.mp3" id="audio" loop></audio>
+    <audio src="./201657_3579566-lq.mp3" id="bg-audio" loop volume="0.5"></audio>
+    <audio src="./413289_8096222-lq.mp3" id="wall-hit"></audio>
+    <script type="module" src="main.js"></script>
+</body>
+</html>
