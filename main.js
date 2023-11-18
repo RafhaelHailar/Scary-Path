@@ -6,30 +6,279 @@ const context = canvas.getContext("2d");
 canvas.width = canvas.height = 700;
 document.body.appendChild(canvas);
 
-const size = 3;
+const size = canvas.width / map[0].length;
 let checkpoint;
 
 let audio = document.getElementById("audio");
 const bgAudio = document.getElementById("bg-audio");
 const wallHitAudio = document.getElementById("wall-hit");
 
+const AUDIO = {
+    lead: document.getElementById("lead"),
+    ambience: document.getElementById("ambience"),
+    wallCollission: document.getElementById("wall-collission")
+};
 
-function drawMap() {
-    context.clearRect(0,0,canvas.width,canvas.height);
-    context.fillStyle = "black";
-    context.fillRect(0,0,canvas.width,canvas.height);   
-    map.forEach((row,y) => {
-        row.forEach((element,x) => {
-            if (element != 0) {
-                context.fillStyle = element == 1 ? "white" : "blue";
-                context.fillRect((canvas.width / row.length) * x,(canvas.height / map.length) * y,size,size);
-            }
-
-            if (element == 2) checkpoint = {x,y};
-        });
-    });
+function inRange(number,from,to) {
+	return number >= from && number < to;
 }
 
+class World {
+    constructor(map) {
+        this.map = map;
+        this.map_row = map[0].length;
+
+        this.CHECKPOINTS = {
+            1: [23,24]
+        }
+
+        this.level = 1;
+    }
+
+    drawMap() {
+        context.fillStyle = "black";
+        context.fillRect(0,0,canvas.width,canvas.height);
+
+        this.map.forEach((row,y) => {
+            row.forEach((element,x) => {
+                if (element == 1) this.drawOne(x,y,"white");
+            });
+        });
+
+        const [checkX,checkY]= this.CHECKPOINTS[this.level];
+        this.drawOne(checkX,checkY,"green");
+    }
+
+    drawOne(x,y,color) {
+        context.fillStyle = color;
+        context.fillRect((canvas.width / this.map_row) * x,(canvas.height / map.length) * y,size,size);
+    }
+
+    isPath(x,y) {
+        return this.map[y][x] != 0;
+    }
+}
+
+class Player {
+    constructor(world,x,y,color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.world = world;
+        this.angle = 0;
+        this.to = {
+            x: 0,
+            y: 0
+        };
+        this.movingTo = {
+            x: 0,
+            y: 0
+        };
+	this.facingAt = "up";
+        this.facingTo = 0;
+        this.movingAt = 20;
+    }
+
+    facing(to) {
+        this.angle += to;
+
+        if (this.angle < 0) this.angle = 360;
+        else if (this.angle > 360) this.angle = 0;
+         
+	let Directions = {
+           "up": [[315,361],[0,46]],
+	   "right": [[46,90],[90,136]],
+	   "down": [[136,180],[180,226]],
+	   "left": [[226,270],[270,315]]
+	};
+   	
+	for (let direction in  Directions) {
+	    for (let [start,end] of  Directions[direction]) {
+	       if (inRange(this.angle,start,end)) {
+		  if (this.facingAt != direction) {
+	             const prevX = this.to.x;
+	    	     
+		     /*
+		    	This will swap the amount of number that we add / decrease that is  needed to make a move on either,
+			horizontally or vertically.
+
+			this.to.x = -1 moving left , 1 moving right
+			this.to.y = -1 moving up, 1 moving down
+
+			//Adding the this everytime I wrote this two variables is so painful. so yeah to.y means this.to.y in the,
+			//explanation below.
+			to.y = this.to.y; 
+			to.x = this.to.x;
+
+			if either the to.x or to.y reaches the needed amount to make a move(this.movingAt which is 20) it will,
+			cause a move.
+
+			But in cases where we change where we facing at for example,we are facing "up" then decided to face at "left",
+			the previous addition / reduction to to.x or to.y will also going to have to change, to make the simulation,
+			of a 3d world happen.
+			Like imagine that, you are in a road where there are blocks / cell that was inscribed / printed on the road,
+			and you are inside a cell and facing forward, then you are walking  backward (you are a back walker hehehe),
+			then you are about to cross the cell that was at your back , but out of whim decided to face in other direction,
+			you face at left, it doesn't make you close at the back of the current direction where we facing at, which is the,
+			right direction, but rather you are close to the left cell (which is the previous back cell when we are facing,
+			forward) now.
+
+			So that was what I was trying to accmoplsih here.
+		 	
+			previously facing = this.facingAt;
+			if we previously facing at the up there are only two other directions we can change to which is the left or right,
+			this make changing the to.x to to.y.
+			Diagram:
+			    ^ -< previously facing
+			   < > -- other direction we can face to
+			    | --- we can't jump to the down / backward since we have to go through left / right first.
+		           
+			   ^
+     Changing to left --> < >
+                        make our up change to our right.
+			So the reduction to our to.y (since up is -1) will be turn to positive to.x (since up is now at the right)
+
+		     */	
+		     if (this.facingAt === "up") {
+			this.to.x = this.to.y * to;
+			this.to.y = prevX * (to * -1);
+		     } else if (this.facingAt === "right") {
+			this.to.x = this.to.y * to;
+			this.to.y = prevX * (to * -1);
+		     } else if (this.facingAt === "down") {
+			this.to.x = this.to.y * to;
+			this.to.y = prevX * (to * -1);
+		     } else if (this.facingAt === "left") {
+			this.to.x = this.to.y * to;
+			this.to.y = prevX * (to * -1);
+		     } 
+
+		     this.facingAt = direction;
+		  }
+		  break;
+	       }
+	    }
+	}
+	
+        document.getElementById("faceAt").innerHTML = this.angle;
+	document.getElementById("faceDirection").innerHTML = this.facingAt;
+        drawCompass(this.angle);
+    }
+
+    moving([toX,toY]) {
+        this.world.drawMap();
+
+        this.to.x += toX;
+        this.to.y += toY;
+
+        document.getElementById("toX").innerHTML = this.to.x;
+        document.getElementById("toY").innerHTML = this.to.y;
+
+        let addX = 0,
+            addY = 0;
+
+        if (Math.abs(this.to.x) >= this.movingAt) {
+            addX = 1 * toX;
+            this.to.x = 0;
+        }    
+
+        if (Math.abs(this.to.y) >= this.movingAt) {
+            addY = 1 * toY;
+            this.to.y = 0;
+        }
+
+        let newX = this.x + addX,
+            newY = this.y + addY;
+
+        if (this.world.isPath(newX,newY)) {
+            this.x = newX;
+            this.y = newY;
+        }
+
+        this.draw();
+
+    }
+
+    draw() {
+        this.world.drawOne(this.x,this.y,this.color);
+    }
+
+    update() {
+        this.facing(this.facingTo);
+        this.moving([this.movingTo.x,this.movingTo.y]); 
+        this.draw();
+    }
+}
+
+const world = new World(map);
+
+const player = new Player(world,23,39,"red");
+
+const KEYSUP = {
+    "a": function() {
+        player.movingTo.x = -1;
+    },
+    "w": function() {
+        player.movingTo.y = -1;
+    },
+    "s": function() {
+        player.movingTo.y = 1;
+    },
+    "d": function() {
+        player.movingTo.x = 1;
+    },
+    "ArrowLeft": function() {
+        player.facingTo = -1;
+    },
+    "ArrowRight": function() {
+        player.facingTo = 1;
+    }
+}
+
+const KEYSDOWN = {
+    "a": function() {
+        player.movingTo.x = 0;
+    },
+    "w": function() {
+        player.movingTo.y = 0;
+    },
+    "s": function() {
+        player.movingTo.y = 0;
+    },
+    "d": function() {
+        player.movingTo.x = 0;
+    },
+    "ArrowLeft": function() {
+        player.facingTo = 0;
+    },
+    "ArrowRight": function() {
+        player.facingTo = 0;
+    }
+}
+
+window.addEventListener("keydown",function(event) {
+    const action = KEYSUP[event.key];
+    
+    if (action) action();
+});
+
+window.addEventListener("keyup",function(event) {
+    const action = KEYSDOWN[event.key];
+    
+    if (action) action();
+});
+
+function update() {
+    context.clearRect(0,0,canvas.width,canvas.height); 
+
+    world.drawMap(); 
+    player.update();
+    requestAnimationFrame(update);
+}
+
+requestAnimationFrame(update);
+
+/* 
 function pathFinder(from,paths,to) {
     const places = [{at: from,paths}];
     const directions = [
@@ -49,8 +298,6 @@ function pathFinder(from,paths,to) {
         }
     }
 }
-
-drawMap();
 
 function isInRange([from,to],number) {
     return number >= from && number < to;
@@ -78,8 +325,8 @@ function getShouldFaceAt(from,to) {
     if (direction[1] == -1) return "up";
     if (direction[1] == 1) return "down";
 }
-
-const player = {
+ */
+/* const player = {
     x: 30,
     y: 40,
     toX: 0,
@@ -210,12 +457,11 @@ const player = {
         this.draw();
     },
     draw() {
-        drawMap();
         
         let startTime = performance.now();
         let path = pathFinder([this.x,this.y],[],[checkpoint.x,checkpoint.y]);
         let endTime = performance.now();
-        /*  console.log(endTime - startTime); */
+        /*  console.log(endTime - startTime); 
         
         for (let [x,y] of path) {
             context.fillStyle = "gold";
@@ -241,20 +487,7 @@ const player = {
         document.getElementById("faceDirection").innerHTML = getDirectionFacing(this.faceAt);
         document.getElementById("shouldFace").innerHTML = getShouldFaceAt([this.x,this.y],[path[0][0],path[0][1]]);
     }
-}
-
-player.draw();
-
-function as() {
-    audio.play();
-}
-
-const keys = {
-    left: false,
-    right: false,
-    up: false,
-    down: false,
-}
+} */
 
 function drawCompass(angle) {
     const containerSize = 70;
@@ -270,7 +503,7 @@ function drawCompass(angle) {
     context.restore();
 }
 
-window.addEventListener("keydown",function(event) {
+/* window.addEventListener("keydown",function(event) {
     switch(event.key) {
         case "a": 
             keys.left = true;
@@ -289,7 +522,7 @@ window.addEventListener("keydown",function(event) {
             player.moving("y",1);
             break;
         case "g":
-            as();
+            audio.play();
             break;
         case "e":
             bgAudio.play();
@@ -301,6 +534,7 @@ window.addEventListener("keydown",function(event) {
             player.facing(1);
             break;
     }
+
 });
 
 window.addEventListener("keyup",function(event) {
@@ -318,4 +552,15 @@ window.addEventListener("keyup",function(event) {
             keys.down = false;
             break;
     }
+}); */
+
+
+
+canvas.addEventListener("mousemove",function(event) {
+    const blockCoord = document.getElementById("blockCoord");
+    let mouseX = event.offsetX;
+    let mouseY = event.offsetY;
+    let blockX = Math.floor(mouseX / (canvas.width / world.map_row));
+    let blockY = Math.floor(mouseY / (canvas.height / map.length));
+    blockCoord.innerHTML = `X: ${blockX} Y: ${blockY}`;  
 });

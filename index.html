@@ -12,6 +12,9 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            color: aliceblue;
+            background: rgba(0,0,0,.90);
+            font-family: Arial, Helvetica, sans-serif;
         }
 
         .position {
@@ -21,7 +24,10 @@
 
         canvas {
             /* visibility: hidden; */
+            border: 1px solid red;
         }
+
+
         
     </style>
 </head>
@@ -33,6 +39,7 @@
         <div>facing at: <span id="faceAt">0</span></div>
         <div>facing direction: <span id="faceDirection">up</span></div>
         <div>should face at: <span id="shouldFace">left</span></div>
+        <div>block coordinates: <span id="blockCoord"></span></div>
     </div>
 
     <audio src="./523758_6142149-lq.mp3" id="audio" loop></audio>
