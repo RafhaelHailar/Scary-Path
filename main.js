@@ -16,7 +16,7 @@ const wallHitAudio = document.getElementById("wall-hit");
 const AUDIO = {
     lead: document.getElementById("lead"),
     ambience: document.getElementById("ambience"),
-    wallCollission: document.getElementById("wall-collission")
+    wallCollission: document.getElementById("wall-hit")
 };
 
 function inRange(number,from,to) {
@@ -86,7 +86,7 @@ class Player {
         else if (this.angle > 360) this.angle = 0;
          
 	let Directions = {
-           "up": [[315,361],[0,46]],
+       "up": [[315,361],[0,46]],
 	   "right": [[46,90],[90,136]],
 	   "down": [[136,180],[180,226]],
 	   "left": [[226,270],[270,315]]
@@ -128,31 +128,34 @@ class Player {
 			previously facing = this.facingAt;
 			if we previously facing at the up there are only two other directions we can change to which is the left or right,
 			this make changing the to.x to to.y.
+            to = -1 for moving the head counter clockwise , 1 for moving the head clockwise.
 			Diagram:
 			    ^ -< previously facing
 			   < > -- other direction we can face to
 			    | --- we can't jump to the down / backward since we have to go through left / right first.
-		           
-			   ^
-     Changing to left --> < >
-                        make our up change to our right.
-			So the reduction to our to.y (since up is -1) will be turn to positive to.x (since up is now at the right)
-
+		        Since it was guaranteed that when we change what direction our facing, the to.x and to.y will be swapped.
+                So the calculations for our new to.x and to.y is:
+                the new to.x is the previous to.y multiplied by the to, it is because when we are facing up, and moving up making the to.y to be a number less than 0 (since up is -1 again),
+                then decided to face at right, making the "to" to be +1 (because to be able to face to right, when you are facing up you have to rotate your head clockwise),
+                Now that we are facing at right moving up we decrease the to.x by 1,and we have to have a negative number to move up.
+                
+                the new to.y is the previous to.x multiplied by the inverse to, we applied the same logic as getting the new to.x but the to is inverse.
 		     */	
-		     if (this.facingAt === "up") {
-			this.to.x = this.to.y * to;
-			this.to.y = prevX * (to * -1);
-		     } else if (this.facingAt === "right") {
-			this.to.x = this.to.y * to;
-			this.to.y = prevX * (to * -1);
-		     } else if (this.facingAt === "down") {
-			this.to.x = this.to.y * to;
-			this.to.y = prevX * (to * -1);
-		     } else if (this.facingAt === "left") {
-			this.to.x = this.to.y * to;
-			this.to.y = prevX * (to * -1);
-		     } 
-
+		   //  if (this.facingAt === "up") {
+		   // this.to.x = this.to.y * to;
+		   // this.to.y = prevX * (to * -1);
+		   //  } else if (this.facingAt === "right") {
+		   // this.to.x = this.to.y * to;
+		   // this.to.y = prevX * (to * -1);
+		   //  } else if (this.facingAt === "down") {
+		   // this.to.x = this.to.y * to;
+		   // this.to.y = prevX * (to * -1);
+		   //  } else if (this.facingAt === "left") {
+		   // this.to.x = this.to.y * to;
+		   // this.to.y = prevX * (to * -1);
+		   //  } 
+             this.to.x = this.to.y * to;
+             this.to.y = prevX * (to * -1);
 		     this.facingAt = direction;
 		  }
 		  break;
@@ -177,13 +180,70 @@ class Player {
         let addX = 0,
             addY = 0;
 
+        /*
+         Pressing the a or d button makes a subtraction or  addition respectively to the to.x value.
+         When to to.x reach the require value need to make a move which is the this.movingAt the movement / changes of the position
+         is depend on what we are currently facing at, to simulate the 3d world.
+         So our calculation for movement in this code below (when the to.x meets this.movingAt)
+         When facing left
+             the right side is the up,
+             the left side is the down.
+                      ^
+ Currently facing -->< > 
+                      | // it is down just kind find an arrow down symbol in my keyboard
+             so when we meets the this.movingAt and we meet it at negative, we moves down
+             meeting at positive we move up.
+         So thats how I do it.
+         I'm not going to do it with the rest, do it if you want though.
+        */
         if (Math.abs(this.to.x) >= this.movingAt) {
-            addX = 1 * toX;
+            switch (this.facingAt) {
+               case "left":
+                    addY = -toX;
+                    break;
+               case  "up":
+                    addX = toX;
+                    break;
+               case  "right":
+                    addY = toX;
+                    break;
+               case  "down":
+                    addX = -toX;
+                    break;
+            }
             this.to.x = 0;
         }    
 
+        /*
+         The calculation for movement in this code below (when the to.y meets this.movingAt)
+         When facing down
+              the up side is down,
+              the down side is up.
+                       ^
+                      < >
+  Currently facing --> | 
+             So when we meets the this.movingAt and we meet it at negative, we moves down
+             meeting at positive we move up.
+
+             Because moving forward is negative, moving backward is positive.
+        */
+
         if (Math.abs(this.to.y) >= this.movingAt) {
-            addY = 1 * toY;
+            switch (this.facingAt) {
+               case "left":
+                    addX = toY;
+                    break;
+               case  "up":
+                    addY = toY;
+                    break;
+               case  "right":
+                    addX = -toY;
+                    break;
+               case  "down":
+                    addY = -toY;
+                    break;
+            }
+            
             this.to.y = 0;
         }
 
@@ -193,7 +253,7 @@ class Player {
         if (this.world.isPath(newX,newY)) {
             this.x = newX;
             this.y = newY;
-        }
+        } else AUDIO.wallCollission.play();
 
         this.draw();
 
@@ -210,10 +270,26 @@ class Player {
     }
 }
 
+class Monster {
+    constructor(x,y,color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.paths = [];
+    }
+
+    getPath() {
+        this.paths = pathFinder([player.x,player.y],[],10);
+    }
+
+}
 const world = new World(map);
 
 const player = new Player(world,23,39,"red");
-
+let playerToCheckPoint = pathFinder([23,39],[],[23,34]);
+console.log(playerToCheckPoint);
+console.log(isSameArray([3,2,1],[3,2,1]));
+console.log(pathFinder([23,39],[],10));
 const KEYSUP = {
     "a": function() {
         player.movingTo.x = -1;
@@ -278,27 +354,44 @@ function update() {
 
 requestAnimationFrame(update);
 
-/* 
 function pathFinder(from,paths,to) {
     const places = [{at: from,paths}];
     const directions = [
         [-1,0],[1,0],
         [0,-1],[0,1]
     ];
+    const allPaths = [];
     
     for (let i = 0;i < places.length;i++) {
         let {at,paths} = places[i];
         let [atX,atY] = at;
         for (let [addX,addY] of directions) {
             const newPlace = [atX + addX,atY + addY];
-            const [toX,toY] = to;
-            if (newPlace[0] == toX && newPlace[1] == toY) return paths.concat([newPlace]);
-            if (!places.some(place => place.at[0] == newPlace[0] && place.at[1] == newPlace[1]) &&
-                map[newPlace[1]] != undefined && map[newPlace[1]][newPlace[0]] == 1) places.push({at: newPlace,paths: paths.concat([newPlace])});
+            let toX,toY;
+            if (typeof to === "object") {
+                toX = to[0];
+                toY = to[1];
+            }
+            let newPath = paths.concat([newPlace]);
+            if (typeof to === "number" && world.isPath(newPlace[0],newPlace[1]) && newPath.length === to) {
+                allPaths.push(newPath);
+            } else if (newPlace[0] == toX && newPlace[1] == toY && !(places.some(place => isSameArray(place.at,newPlace)))) allPaths.push(newPath);
+            else if (!(places.some(place => isSameArray(place.at,newPlace))) &&
+                map[newPlace[1]] != undefined && map[newPlace[1]][newPlace[0]] == 1) places.push({at: newPlace,paths: newPath});
         }
     }
+    return allPaths;
 }
 
+function isSameArray(first,second) {
+    if (first.length != second.length) return false;
+    for (let i = 0;i < first.length;i++) {
+        if (first[i] !== second[i]) return false;
+    }
+    return true;
+}
+
+/*
 function isInRange([from,to],number) {
     return number >= from && number < to;
 }
