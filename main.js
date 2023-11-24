@@ -31,7 +31,7 @@ class World {
         this.CHECKPOINTS = {
             1: [23,24]
         }
-
+        this.block_size = 20; // the amount that the player have to move to be able to translate to other block
         this.level = 1;
     }
 
@@ -55,7 +55,7 @@ class World {
     }
 
     isPath(x,y) {
-        return this.map[y][x] != 0;
+        return this.map[y] && (this.map[y][x] > 0);
     }
 }
 
@@ -76,7 +76,7 @@ class Player {
         };
 	this.facingAt = "up";
         this.facingTo = 0;
-        this.movingAt = 20;
+        this.movingAt = world.block_size;
     }
 
     facing(to) {
@@ -164,7 +164,7 @@ class Player {
 	}
 	
         document.getElementById("faceAt").innerHTML = this.angle;
-	document.getElementById("faceDirection").innerHTML = this.facingAt;
+        document.getElementById("faceDirection").innerHTML = this.facingAt;
         drawCompass(this.angle);
     }
 
@@ -267,29 +267,132 @@ class Player {
         this.facing(this.facingTo);
         this.moving([this.movingTo.x,this.movingTo.y]); 
         this.draw();
+        document.getElementById("playerX").innerHTML = this.x;
+        document.getElementById("playerY").innerHTML = this.y;
     }
 }
 
 class Monster {
-    constructor(x,y,color) {
-        this.x = x;
-        this.y = y;
+    constructor(world,color) {
+        this.x = this.y = null;
         this.color = color;
+        this.paths = [];
+        this.world = world;
+        this.steps = 0;
+        this.moveAt = this.world.block_size + 50;
+        this.spawningRate = 200;
+        this.spawnCount = 0;
+        this.spawned = false;
+        this.toPlayer = 1; // monster direction state 1 going to player, 0 going away to player and others hide the monster
+    }
+
+
+    despawn() {
+        this.spawned = false;
+        this.x = this.y = null;
         this.paths = [];
     }
 
-    getPath() {
-        this.paths = pathFinder([player.x,player.y],[],10);
+    spawn() {
+        this.spawned = true;
+        this.toPlayer = 1;
+        this.getPath();
     }
 
+    getPath() {
+        const offsetPlayer = 10; //the distance to the player the monster will be placed at
+        this.paths = pathFinder([player.x,player.y],[],offsetPlayer);
+        this.pathTaken = [[player.x,player.y],...this.paths[0]];
+        this.currentStep = 0;
+        let pathTakenStart = this.pathTaken[this.pathTaken.length - 1];
+        this.x = pathTakenStart[0];
+        this.y = pathTakenStart[1];
+        document.getElementById("monsPaths").innerHTML = JSON.stringify(this.pathTaken);
+    }
+
+    moveBlock() {
+        this.currentStep++;
+        
+        if (this.currentStep > this.pathTaken.length - 1) {
+            // -1 because, the function starts adding the current step before getting the path by it.
+            // so if we starts at 0,the path that will be taken is the path 1 or the second insted of the first(the 0).
+            this.currentStep = -1; 
+            this.toPlayer--;
+            // get the last path so it will be differnt than the first one picked
+            this.pathTaken = this.paths[this.paths.length - 1];
+            document.getElementById("monsPaths").innerHTML = JSON.stringify(this.pathTaken);
+            return;
+        }
+        
+        /*
+         if the direction state (this.toPlayer) is 1, which is going to the player,
+         the path that will be move is from the last of the array to the start,
+         which is from away to the player, to the player.
+         formula(1) (this.pathTaken.length - 1) - this.currentStep
+         the higher the currentStep is the closer we are to the player.
+         if the direction state is 0, which is going away to the player,
+         the path will be move is from the start of the array to the end,
+         which is from the player,to away from the player.
+         formula(0) this.currentStep
+         the lower the currentStep the closer we are to the player.
+         
+         to make the computation change whenever we change state,
+         ((this.pathTaken.length - 1) * this.toPlayer) -> we make it gone whenever we are going away to the player,
+         so that we can do the "this.currentStep" computation, and if we are going to player we make it present
+         both by the this.toPlayer (0 == gone, 1 == present) then,  
+         + (1 - (this.toPlayer * 2)) * this.currentStep -> we make the this.currentStep a positive when going away,
+         and negative when going to the player, by multiplying the this.toPlayer which will outcome either,
+         (0 == 0,1 == 2) then subtracting 1 by it, we can produce either a positive 1 (0) or negative 1 (1).
+         so we can do the -this.currentStep from the formula (1) 
+         and the this.currentStep from the formula (0).
+
+        */
+        let path = this.pathTaken[((this.pathTaken.length - 1) * this.toPlayer) + (1 - (this.toPlayer * 2)) *this.currentStep];
+        this.x = path[0];
+        this.y = path[1];
+    }
+
+    move() {
+        if (this.toPlayer < 0) {
+            this.despawn();
+            return; 
+        }
+        
+        if (this.steps < this.moveAt) this.steps++;
+        else { 
+            this.moveBlock();
+            this.steps = 0;
+        }  
+    }
+
+    draw() {
+        this.world.drawOne(this.x,this.y,this.color);
+    }
+        
+    update() {
+        document.getElementById("monsSpawned").innerHTML = this.spawned ? "Spawned" : "De Spawned";
+        if (!this.x || !this.y) {
+            if (this.spawnCount < this.spawningRate) this.spawnCount++;
+            else {
+                this.spawn();
+                this.spawnCount = 0;
+            }
+            return;
+        };
+          this.move();
+          this.draw();
+          document.getElementById("monsterX").innerHTML = this.x;
+          document.getElementById("monsterY").innerHTML = this.y;
+    }
 }
 const world = new World(map);
 
 const player = new Player(world,23,39,"red");
+const monster = new Monster(world,"blue");
+monster.getPath();
+console.log(monster.x,monster.y);
 let playerToCheckPoint = pathFinder([23,39],[],[23,34]);
 console.log(playerToCheckPoint);
-console.log(isSameArray([3,2,1],[3,2,1]));
-console.log(pathFinder([23,39],[],10));
 const KEYSUP = {
     "a": function() {
         player.movingTo.x = -1;
@@ -349,33 +452,62 @@ function update() {
 
     world.drawMap(); 
     player.update();
+    monster.update();
     requestAnimationFrame(update);
 }
 
 requestAnimationFrame(update);
 
+//path finding function
+/*
+ * @params {int[x,y]} from
+ * @params {[int[],...,int[]][[x,y],...,[x,y]]} paths
+ * @params {int[x,y] | int} to
+ * 
+ * @return {int[[x,y]...[x,y]] || [int[],...,int[]][[x,y],...,[x,y]] }
+*/
 function pathFinder(from,paths,to) {
+    //keep track of all the places been through
     const places = [{at: from,paths}];
+    //directions that will be check from the current place 
     const directions = [
-        [-1,0],[1,0],
-        [0,-1],[0,1]
+        [-1,0],[1,0], //left right
+        [0,-1],[0,1] //top bottom
     ];
+
+    //all paths acquired
     const allPaths = [];
     
     for (let i = 0;i < places.length;i++) {
         let {at,paths} = places[i];
         let [atX,atY] = at;
         for (let [addX,addY] of directions) {
+            //move to the direction
             const newPlace = [atX + addX,atY + addY];
+            
             let toX,toY;
+            //check if the to is an array if it is assign the toX,toY
             if (typeof to === "object") {
                 toX = to[0];
                 toY = to[1];
             }
+
+            //the paths been through including the new place we move
             let newPath = paths.concat([newPlace]);
+            
+            //if the target(to) is a number, check if the newPath created meet the length which is the target and,
+            //check if the place we move to is a path in the world,
+            //then if all of them are satisfied,  add it to the paths acquired.
             if (typeof to === "number" && world.isPath(newPlace[0],newPlace[1]) && newPath.length === to) {
                 allPaths.push(newPath);
+                //if the target(to) is an array, check if the place we move to is a path in the world,
+                //and if the new place we move to is not explored yet or we haven't been throught it yet,
+                //then if all of them are satisfied, add it to the paths acquired.
             } else if (newPlace[0] == toX && newPlace[1] == toY && !(places.some(place => isSameArray(place.at,newPlace)))) allPaths.push(newPath);
+                //if all of the above is conditions are not satisfied, check if we already explore the new place,
+                //and if the new place we move to is a pth in the world
+                //then if all of them are satisfied, we add the place we move to the places array and the paths,
+                //we go through to get to the new place.
             else if (!(places.some(place => isSameArray(place.at,newPlace))) &&
                 map[newPlace[1]] != undefined && map[newPlace[1]][newPlace[0]] == 1) places.push({at: newPlace,paths: newPath});
         }
