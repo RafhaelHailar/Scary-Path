@@ -16,7 +16,8 @@ const wallHitAudio = document.getElementById("wall-hit");
 const AUDIO = {
     lead: document.getElementById("lead"),
     ambience: document.getElementById("ambience"),
-    wallCollission: document.getElementById("wall-hit")
+    wallCollission: document.getElementById("wall-hit"),
+    footstep: document.getElementById("footstep")
 };
 
 function inRange(number,from,to) {
@@ -74,9 +75,16 @@ class Player {
             x: 0,
             y: 0
         };
-	this.facingAt = "up";
+        this.facingAt = "up";
         this.facingTo = 0;
         this.movingAt = world.block_size;
+
+
+        this.isWalking = {
+            counter: 0,
+            stopAt: 100,
+            value: false
+        };
     }
 
     facing(to) {
@@ -177,6 +185,10 @@ class Player {
         document.getElementById("toX").innerHTML = this.to.x;
         document.getElementById("toY").innerHTML = this.to.y;
 
+        if (toX !== 0 || toY !== 0) {
+           this.isWalking.value = true;
+           this.isWalking.count = 0;
+        }
         let addX = 0,
             addY = 0;
 
@@ -254,9 +266,8 @@ class Player {
             this.x = newX;
             this.y = newY;
         } else AUDIO.wallCollission.play();
-
+        
         this.draw();
-
     }
 
     draw() {
@@ -267,6 +278,19 @@ class Player {
         this.facing(this.facingTo);
         this.moving([this.movingTo.x,this.movingTo.y]); 
         this.draw();
+        
+        if (this.isWalking.value) {
+            if (this.isWalking.count < this.isWalking.stopAt) {
+                this.isWalking.count++;
+                if (AUDIO.footstep.currentTime === 0) 
+                    AUDIO.footstep.play();
+            } else {
+                this.isWalking.count = 0;
+                AUDIO.footstep.pause();
+                AUDIO.footstep.currentTime = 0;
+                this.isWalking.value = false;
+            }
+        }
         document.getElementById("playerX").innerHTML = this.x;
         document.getElementById("playerY").innerHTML = this.y;
     }
@@ -279,8 +303,8 @@ class Monster {
         this.paths = [];
         this.world = world;
         this.steps = 0;
-        this.moveAt = this.world.block_size + 50;
-        this.spawningRate = 200;
+        this.moveAt = this.world.block_size - 10;
+        this.spawningRate = 20;
         this.spawnCount = 0;
         this.spawned = false;
         this.toPlayer = 1; // monster direction state 1 going to player, 0 going away to player and others hide the monster
@@ -302,7 +326,7 @@ class Monster {
     getPath() {
         const offsetPlayer = 10; //the distance to the player the monster will be placed at
         this.paths = pathFinder([player.x,player.y],[],offsetPlayer);
-        this.pathTaken = [[player.x,player.y],...this.paths[0]];
+        this.pathTaken = [[player.x,player.y],...this.paths[Math.floor(Math.random() * this.paths.length)]]; //upto the player, including the player position
         this.currentStep = 0;
         let pathTakenStart = this.pathTaken[this.pathTaken.length - 1];
         this.x = pathTakenStart[0];
@@ -319,7 +343,7 @@ class Monster {
             this.currentStep = -1; 
             this.toPlayer--;
             // get the last path so it will be differnt than the first one picked
-            this.pathTaken = this.paths[this.paths.length - 1];
+            this.pathTaken = this.paths[Math.floor(Math.random() * this.paths.length)];
             document.getElementById("monsPaths").innerHTML = JSON.stringify(this.pathTaken);
             return;
         }
@@ -348,8 +372,11 @@ class Monster {
 
         */
         let path = this.pathTaken[((this.pathTaken.length - 1) * this.toPlayer) + (1 - (this.toPlayer * 2)) *this.currentStep];
+
         this.x = path[0];
         this.y = path[1];
+
+        document.getElementById("monsterTo").innerHTML = `X: ${this.x},Y: ${this.y}`;
     }
 
     move() {
@@ -357,7 +384,6 @@ class Monster {
             this.despawn();
             return; 
         }
-        
         if (this.steps < this.moveAt) this.steps++;
         else { 
             this.moveBlock();
@@ -371,7 +397,7 @@ class Monster {
         
     update() {
         document.getElementById("monsSpawned").innerHTML = this.spawned ? "Spawned" : "De Spawned";
-        if (!this.x || !this.y) {
+        if (this.x === null || this.y === null) {
             if (this.spawnCount < this.spawningRate) this.spawnCount++;
             else {
                 this.spawn();
@@ -405,6 +431,9 @@ const KEYSUP = {
     },
     "d": function() {
         player.movingTo.x = 1;
+    },
+    "k": function() {
+        AUDIO.ambience.play();
     },
     "ArrowLeft": function() {
         player.facingTo = -1;
@@ -778,8 +807,6 @@ window.addEventListener("keyup",function(event) {
             break;
     }
 }); */
-
-
 
 canvas.addEventListener("mousemove",function(event) {
     const blockCoord = document.getElementById("blockCoord");
