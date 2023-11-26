@@ -21,6 +21,9 @@ const AUDIO = {
     monsterNear: document.getElementById("monster-near")
 };
 
+AUDIO.footstep.volume = 0.2;
+AUDIO.ambience.volume = 0.5;
+
 function inRange(number,from,to) {
 	return number >= from && number < to;
 }
@@ -57,6 +60,13 @@ class World {
     }
 
     isPath(x,y) {
+        //check if the first argument is an array, if it was the array must be [x,y] type then check if,
+        //it is a path in the map by first checking the y (for the column)value in the array(since the array is,
+        //two dimensional) then checking the x (for the row) if it is null,undefined or 0 it is not a path.
+        if (Array.isArray(x)) { //the reason for this is that some code uses the type [x,y] instead of individually x and y.
+            let [rX,rY] = x;
+            return this.map[rY] && (this.map[rY][rX] > 0);
+        }
         return this.map[y] && (this.map[y][x] > 0);
     }
 }
@@ -270,6 +280,53 @@ class Player {
         
         this.draw();
     }
+    
+    createSensors() {
+        const blocks = [{at: [this.x,this.y],magnitude: 1}];
+        const reducer = 0.9;
+        const directions = [
+            [-1,0],[1,0], //left right
+            [0,-1],[0,1] //top bottom
+        ];
+
+        let depth = 0;
+        const max_depth = 30;
+        const other_max_depth = 20;
+
+        for (let i = 0;i < blocks.length;i++) {
+            let {at,magnitude} = blocks[i];
+            let [atX,atY] = at;
+            for (let [addX,addY] of directions) {
+                if (depth > max_depth) break;
+                let newAt = [atX + addX,atY + addY];
+                 
+                if (!blocks.some(block => isSameArray(block.at,newAt)) && this.world.isPath(newAt)) {
+                        if (!(depth > other_max_depth &&
+                            ((this.facingAt === "left" && (addX !== -1 || newAt[1] !== this.y) ) ||
+                            (this.facingAt === "right" && (addX !== 1 || newAt[1] !== this.y) ) ||
+                            (this.facingAt === "up" && (addY !== -1 || newAt[0] !== this.x) ) ||
+                            (this.facingAt === "down" && (addY !== 1 || newAt[0] !== this.x) ))
+                           ))
+                                blocks.push({at: newAt,magnitude: magnitude * reducer});
+                }
+            }
+            depth++;
+        }
+
+        for (let i = 0;i < blocks.length;i++) {
+           const {at,magnitude} = blocks[i]; 
+           const [x,y] = at;
+           const color = `hsl(${255 * magnitude},100%,50%)`;
+           world.drawOne(x,y,color);
+        }
+
+        if (monster && monster.spawned) {
+           const monsterBlock = blocks.find(block => isSameArray(block.at,[monster.x,monster.y]));
+           if (monsterBlock) {
+               AUDIO.monsterNear.volume = monsterBlock.magnitude;
+           } else AUDIO.monsterNear.volume = 0.1;
+        }
+    }
 
     draw() {
         this.world.drawOne(this.x,this.y,this.color);
@@ -278,6 +335,7 @@ class Player {
     update() {
         this.facing(this.facingTo);
         this.moving([this.movingTo.x,this.movingTo.y]); 
+        this.createSensors();
         this.draw();
         
         if (this.isWalking.value) {
@@ -292,6 +350,7 @@ class Player {
                 this.isWalking.value = false;
             }
         }
+
         document.getElementById("playerX").innerHTML = this.x;
         document.getElementById("playerY").innerHTML = this.y;
     }
@@ -304,11 +363,12 @@ class Monster {
         this.paths = [];
         this.world = world;
         this.steps = 0;
-        this.moveAt = this.world.block_size - 10;
+        this.moveAt = this.world.block_size + 60;
         this.spawningRate = 20;
         this.spawnCount = 0;
         this.spawned = false;
         this.toPlayer = 1; // monster direction state 1 going to player, 0 going away to player and others hide the monster
+        this.spawn();
     }
 
 
@@ -316,12 +376,17 @@ class Monster {
         this.spawned = false;
         this.x = this.y = null;
         this.paths = [];
+
+        AUDIO.monsterNear.pause();
+        AUDIO.monsterNear.currentTime = 0;
     }
 
     spawn() {
         this.spawned = true;
         this.toPlayer = 1;
         this.getPath();
+        
+        AUDIO.monsterNear.play();
     }
 
     getPath() {
@@ -416,10 +481,6 @@ const world = new World(map);
 
 const player = new Player(world,23,39,"red");
 const monster = new Monster(world,"blue");
-monster.getPath();
-console.log(monster.x,monster.y);
-let playerToCheckPoint = pathFinder([23,39],[],[23,34]);
-console.log(playerToCheckPoint);
 const KEYSUP = {
     "a": function() {
         player.movingTo.x = -1;
@@ -435,6 +496,9 @@ const KEYSUP = {
     },
     "k": function() {
         AUDIO.ambience.play();
+    },
+    "m": function() {
+        player.createSensors();
     },
     "ArrowLeft": function() {
         player.facingTo = -1;
