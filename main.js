@@ -54,6 +54,10 @@ class World {
         this.drawOne(checkX,checkY,"green");
     }
 
+    getCheckpoint() {
+        return this.CHECKPOINTS[this.level];
+    }
+
     drawOne(x,y,color) {
         context.fillStyle = color;
         context.fillRect((canvas.width / this.map_row) * x,(canvas.height / map.length) * y,size,size);
@@ -290,8 +294,8 @@ class Player {
         ];
 
         let depth = 0;
-        const max_depth = 30;
-        const other_max_depth = 20;
+        const max_depth = 150;
+        const other_max_depth = max_depth;
 
         for (let i = 0;i < blocks.length;i++) {
             let {at,magnitude} = blocks[i];
@@ -301,13 +305,19 @@ class Player {
                 let newAt = [atX + addX,atY + addY];
                  
                 if (!blocks.some(block => isSameArray(block.at,newAt)) && this.world.isPath(newAt)) {
+                        let reducerReducer = 0.9;
+                        if ((this.facingAt === "left" && (addX === -1 || newAt[1] === this.y) ) ||
+                            (this.facingAt === "right" && (addX === 1 || newAt[1] === this.y) ) || 
+                            (this.facingAt === "up" && (addY === -1 || newAt[0] === this.x) ) ||
+                            (this.facingAt === "down" && (addY === -1 || newAt[0] === this.x) )) reducerReducer = 1;
+
                         if (!(depth > other_max_depth &&
                             ((this.facingAt === "left" && (addX !== -1 || newAt[1] !== this.y) ) ||
                             (this.facingAt === "right" && (addX !== 1 || newAt[1] !== this.y) ) ||
                             (this.facingAt === "up" && (addY !== -1 || newAt[0] !== this.x) ) ||
                             (this.facingAt === "down" && (addY !== 1 || newAt[0] !== this.x) ))
                            ))
-                                blocks.push({at: newAt,magnitude: magnitude * reducer});
+                                blocks.push({at: newAt,magnitude: magnitude * (reducer * reducerReducer)});
                 }
             }
             depth++;
@@ -326,6 +336,12 @@ class Player {
                AUDIO.monsterNear.volume = monsterBlock.magnitude;
            } else AUDIO.monsterNear.volume = 0.1;
         }
+        
+        const checkpoint = this.world.getCheckpoint();
+        const leadBlock = blocks.find(block => isSameArray(block.at,checkpoint));
+        if (leadBlock) {
+            AUDIO.lead.volume = leadBlock.magnitude;
+        } else AUDIO.lead.volume = 0.05;
     }
 
     draw() {
@@ -363,8 +379,8 @@ class Monster {
         this.paths = [];
         this.world = world;
         this.steps = 0;
-        this.moveAt = this.world.block_size + 60;
-        this.spawningRate = 20;
+        this.moveAt = this.world.block_size + 120;
+        this.spawningRate = 60;
         this.spawnCount = 0;
         this.spawned = false;
         this.toPlayer = 1; // monster direction state 1 going to player, 0 going away to player and others hide the monster
@@ -495,10 +511,10 @@ const KEYSUP = {
         player.movingTo.x = 1;
     },
     "k": function() {
-        AUDIO.ambience.play();
+        AUDIO.lead.play();
     },
     "m": function() {
-        player.createSensors();
+        AUDIO.ambience.play();
     },
     "ArrowLeft": function() {
         player.facingTo = -1;
