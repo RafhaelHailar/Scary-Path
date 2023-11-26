@@ -17,7 +17,8 @@ const AUDIO = {
     lead: document.getElementById("lead"),
     ambience: document.getElementById("ambience"),
     wallCollission: document.getElementById("wall-hit"),
-    footstep: document.getElementById("footstep")
+    footstep: document.getElementById("footstep"),
+    monsterNear: document.getElementById("monster-near")
 };
 
 function inRange(number,from,to) {
