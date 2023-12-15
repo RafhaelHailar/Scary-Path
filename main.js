@@ -287,7 +287,7 @@ class Player {
     
     createSensors() {
         const blocks = [{at: [this.x,this.y],magnitude: 1}];
-        const reducer = 0.9;
+        const reducer = 0.97;
         const directions = [
             [-1,0],[1,0], //left right
             [0,-1],[0,1] //top bottom
@@ -322,14 +322,12 @@ class Player {
             }
             depth++;
         }
-
         for (let i = 0;i < blocks.length;i++) {
            const {at,magnitude} = blocks[i]; 
            const [x,y] = at;
            const color = `hsl(${255 * magnitude},100%,50%)`;
-           world.drawOne(x,y,color);
+           //world.drawOne(x,y,color);
         }
-
         if (monster && monster.spawned) {
            const monsterBlock = blocks.find(block => isSameArray(block.at,[monster.x,monster.y]));
            if (monsterBlock) {
@@ -338,14 +336,30 @@ class Player {
         }
         
         const checkpoint = this.world.getCheckpoint();
+        const closestToPlayer = pathFinder(checkpoint,[],[this.x,this.y]);
+        const lastPlaces = closestToPlayer.map(paths => paths[paths.length - 2]); 
+        const facingToLead = [];
+        for (let path of closestToPlayer) {
+            for (let [x,y] of path) {
+                //this.world.drawOne(x,y,"violet");
+            } 
+        }
+        for (let place of lastPlaces) {
+            facingToLead.push(getShouldFaceAt([this.x,this.y],place)); 
+            this.world.drawOne(place[0],place[1],"red");
+        }
+        this.world.drawOne(checkpoint[0],checkpoint[1],"hsl(255,100%,30%)");        
         const leadBlock = blocks.find(block => isSameArray(block.at,checkpoint));
+        
         if (leadBlock) {
-            AUDIO.lead.volume = leadBlock.magnitude;
-        } else AUDIO.lead.volume = 0.05;
+            AUDIO.lead.volume = leadBlock.magnitude + (facingToLead.includes(this.facingAt) && 0.1);
+        } else AUDIO.lead.volume = 0.05 + (facingToLead.includes(this.facingAt) && 0.1);
     }
 
     draw() {
         this.world.drawOne(this.x,this.y,this.color);
+
+        
     }
 
     update() {
@@ -366,6 +380,8 @@ class Player {
                 this.isWalking.value = false;
             }
         }
+        
+
 
         document.getElementById("playerX").innerHTML = this.x;
         document.getElementById("playerY").innerHTML = this.y;
@@ -402,7 +418,7 @@ class Monster {
         this.toPlayer = 1;
         this.getPath();
         
-        AUDIO.monsterNear.play();
+  //      AUDIO.monsterNear.play();
     }
 
     getPath() {
@@ -576,7 +592,7 @@ requestAnimationFrame(update);
  * 
  * @return {int[[x,y]...[x,y]] || [int[],...,int[]][[x,y],...,[x,y]] }
 */
-function pathFinder(from,paths,to) {
+function pathFinder(from,paths,to,closest = false) {
     //keep track of all the places been through
     const places = [{at: from,paths}];
     //directions that will be check from the current place 
@@ -613,12 +629,14 @@ function pathFinder(from,paths,to) {
                 //if the target(to) is an array, check if the place we move to is a path in the world,
                 //and if the new place we move to is not explored yet or we haven't been throught it yet,
                 //then if all of them are satisfied, add it to the paths acquired.
-            } else if (newPlace[0] == toX && newPlace[1] == toY && !(places.some(place => isSameArray(place.at,newPlace)))) allPaths.push(newPath);
+            } else if (newPlace[0] == toX && newPlace[1] == toY && !(places.some(place => isSameArray(place.at,newPlace)))) {
+                if (closest) return newPath;
+                allPaths.push(newPath);
                 //if all of the above is conditions are not satisfied, check if we already explore the new place,
                 //and if the new place we move to is a pth in the world
                 //then if all of them are satisfied, we add the place we move to the places array and the paths,
                 //we go through to get to the new place.
-            else if (!(places.some(place => isSameArray(place.at,newPlace))) &&
+            } else if (!(places.some(place => isSameArray(place.at,newPlace))) &&
                 map[newPlace[1]] != undefined && map[newPlace[1]][newPlace[0]] == 1) places.push({at: newPlace,paths: newPath});
         }
     }
@@ -633,26 +651,6 @@ function isSameArray(first,second) {
     return true;
 }
 
-/*
-function isInRange([from,to],number) {
-    return number >= from && number < to;
-}
-
-function getDirectionFacing(angle) {
-    const directions = {
-        up: [[0,45],[315,361]],
-        right: [[45,135]],
-        down: [[135,225]],
-        left: [[225,315]]
-    };
-
-    for (let direction in directions) {
-        for (let range of directions[direction]) {
-            if (isInRange(range,angle)) return direction;
-        }
-    }
-}
-
 function getShouldFaceAt(from,to) {
     let direction = [to[0] - from[0],to[1] - from[1]];
     if (direction[0] == -1) return "left";
@@ -660,7 +658,7 @@ function getShouldFaceAt(from,to) {
     if (direction[1] == -1) return "up";
     if (direction[1] == 1) return "down";
 }
- */
+ 
 /* const player = {
     x: 30,
     y: 40,
