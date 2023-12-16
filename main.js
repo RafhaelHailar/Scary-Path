@@ -303,31 +303,67 @@ class Player {
             for (let [addX,addY] of directions) {
                 if (depth > max_depth) break;
                 let newAt = [atX + addX,atY + addY];
-                 
+                
+                /* The same as the pathFinder function,
+                   this createSensors function will try all the path until a certain amount
+                   of path was travelled(max_depth).
+
+                   The depth specify how much we have moved:
+                   (*) asterisk represents path that was tried,
+                   x reresents where we currently at.
+                        depth 1                     depth 2
+                                                        *  
+                                    *                 * * * 
+                                  * x *             * * x * *
+                                    *                 * * * 
+                                                        *  
+                                                        
+                  At the end of the outside for loop, we will have a blocks(which is an array), that contains the path,
+                  the we travelled and their corressponding magnitude (which we will be, how much louder,
+                  the path is). We are going to use it to detect an object distance and the sound of it,
+                  at that given distance.
+
+                  The magnitude was computed by how deep (depth value) that path was, the higher the depth the time that path,
+                  was travelled the lower the volume will be at that point (we use the reducer for making the volume less at each depth).
+                  We also added to the computation of magnitude, whether we(as a player) are facing at the path that tried and the same vertical,
+                  or horizontal position as that path that tried.When we are not reduce the magnitude more, as it somewhat make the simmulation,
+                  a little realistic (like in real life the direction we are focusing, have the higher sound (focusing not facing)).
+
+                  Example we are facing at right, if the position we tried is at forward of right or we also move to the right(when facing is not involved),
+                  and also the same y position then we dont decrease the volume (which is the magnitude) that much, unlike the opposite case.
+
+                */
                 if (!blocks.some(block => isSameArray(block.at,newAt)) && this.world.isPath(newAt)) {
                         let reducerReducer = 0.9;
-                        if ((this.facingAt === "left" && (addX === -1 || newAt[1] === this.y) ) ||
-                            (this.facingAt === "right" && (addX === 1 || newAt[1] === this.y) ) || 
-                            (this.facingAt === "up" && (addY === -1 || newAt[0] === this.x) ) ||
-                            (this.facingAt === "down" && (addY === -1 || newAt[0] === this.x) )) reducerReducer = 1;
+                        if (
+                            //vertical as in the coordinate system
+                            //if the same y (horizontal in our data, think of it as row)
+                            //so addY is adding/reducing on the row(horizontally), addX in the column(vertically)
+                            (this.y === newAt[1] &&
+                               (this.facingAt === "left" && addX === -1) ||
+                               (this.facingAt === "right" && addX === 1)) || 
+                            //the same x (vertical, the column)
+                            (this.x === newAt[0] &&
+                               (this.facingAt === "up" && addY === -1) ||
+                               (this.facingAt === "down" && addY === -1 ))
+                            ) reducerReducer = 1;
 
-                        if (!(depth > other_max_depth &&
-                            ((this.facingAt === "left" && (addX !== -1 || newAt[1] !== this.y) ) ||
-                            (this.facingAt === "right" && (addX !== 1 || newAt[1] !== this.y) ) ||
-                            (this.facingAt === "up" && (addY !== -1 || newAt[0] !== this.x) ) ||
-                            (this.facingAt === "down" && (addY !== 1 || newAt[0] !== this.x) ))
-                           ))
+                        if (!(depth > other_max_depth))
                                 blocks.push({at: newAt,magnitude: magnitude * (reducer * reducerReducer)});
                 }
             }
             depth++;
         }
+
+        // for displaying the magnitudes (the bluer the color the higher)
         for (let i = 0;i < blocks.length;i++) {
            const {at,magnitude} = blocks[i]; 
            const [x,y] = at;
            const color = `hsl(${255 * magnitude},100%,50%)`;
-           //world.drawOne(x,y,color);
+           world.drawOne(x,y,color);
         }
+
+        // check the sound (how loud) of the monster in relative to the player
         if (monster && monster.spawned) {
            const monsterBlock = blocks.find(block => isSameArray(block.at,[monster.x,monster.y]));
            if (monsterBlock) {
@@ -335,6 +371,7 @@ class Player {
            } else AUDIO.monsterNear.volume = 0.1;
         }
         
+        // for the checkpoint (in progress)
         const checkpoint = this.world.getCheckpoint();
         const closestToPlayer = pathFinder(checkpoint,[],[this.x,this.y]);
         const lastPlaces = closestToPlayer.map(paths => paths[paths.length - 2]); 
@@ -352,7 +389,9 @@ class Player {
         const leadBlock = blocks.find(block => isSameArray(block.at,checkpoint));
         
         if (leadBlock) {
-            AUDIO.lead.volume = leadBlock.magnitude + (facingToLead.includes(this.facingAt) && 0.1);
+            let totalVol = leadBlock.magnitude + (facingToLead.includes(this.facingAt) && 0.1);
+            totalVol = totalVol <= 1 ? totalVol : 1;
+            AUDIO.lead.volume = totalVol;
         } else AUDIO.lead.volume = 0.05 + (facingToLead.includes(this.facingAt) && 0.1);
     }
 
