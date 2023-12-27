@@ -378,7 +378,7 @@ class Player {
         const facingToLead = [];
         for (let path of closestToPlayer) {
             for (let [x,y] of path) {
-                //this.world.drawOne(x,y,"violet");
+                this.world.drawOne(x,y,"violet");
             } 
         }
         for (let place of lastPlaces) {
@@ -456,8 +456,8 @@ class Monster {
         this.spawned = true;
         this.toPlayer = 1;
         this.getPath();
-        
-  //      AUDIO.monsterNear.play();
+       
+        AUDIO.monsterNear.play();
     }
 
     getPath() {
@@ -550,7 +550,7 @@ class Monster {
 }
 const world = new World(map);
 
-const player = new Player(world,23,39,"red");
+const player = new Player(world,25,25,"red");
 const monster = new Monster(world,"blue");
 const KEYSUP = {
     "a": function() {
@@ -567,6 +567,9 @@ const KEYSUP = {
     },
     "k": function() {
         AUDIO.lead.play();
+    },
+    "p": function() {
+        AUDIO.ambience.play();
     },
     "m": function() {
         AUDIO.ambience.play();
